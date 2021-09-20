@@ -46,7 +46,7 @@
 - 内容解析器: 从小说的章节页面链接，解析出小说正文内容
 - 评论解析器: 根据小说的章节页面链接，拼凑出的评论页面，解析出评论内容
 
-::: mermaid
+```mermaid
 graph TD
   style Redis-A fill:#600,stroke:#333,stroke-width:4px; 
   style Redis-B fill:#600,stroke:#333,stroke-width:4px; 
@@ -116,12 +116,4 @@ graph TD
     Redis-D --> |同时保存到RabbitMQ中| RabbitMQ-D
 
   end 
-
-
- 
-
-
-
-
- 
-:::
+```
