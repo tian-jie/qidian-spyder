@@ -15,15 +15,66 @@
 
   - 男女： 男生： https://www.qidian.com/all/， 女生： https://www.qidian.com/<B>mm</B>/all/
   - 分类：
-    - 玄幻： https://www.qidian.com/all/<B>chanId21</B>/
+    - 玄幻： https://www.qidian.com/all/<B>chanId21</B>/ 
       - 玄幻下一级分类，东方玄幻：https://www.qidian.com/all/chanId21<B>-subCateId8</B>/
+      - 关键点：以下所有的组合
+      ```
+      data-typeid="21" data-subtypeid="8" 
+      ```
     - 奇幻： https://www.qidian.com/all/chanId1/
+
+    - chanId21
+      - subCateId: 8, 78, 58, 73
+    - chanId1
+      - subCateId: 38, 62, 201, 202, 20092, 20093
+    - chanId2
+      - subCateId: 5, 30, 206, 20099, 20100
+    - chanId22
+      - subCateId: 18, 44, 64, 207, 20101
+
+    - chanId4
+      - subCateId:12, 16,74,130,151,153
+    - chanId15
+      - subCateId:20104,20105,20106,20107,20108,6,209
+    - chanId6
+      - subCateId:54,65,80,230,231
+    - chanId5
+      - subCateId:22,48,220,32,222,223,224,225,226,20094
+    - chanId7
+      - subCateId:7,70,240,20102,20103
+
+    - chanId8
+      - subCateId:28,55,82
+    - chanId9
+      - subCateId:21,25,68,250,251,252,253
+    - chanId10
+      - subCateId:26,35,57,260,20095
+    - chanId12
+      - subCateId:60,66,281,282
+    - chanId20076
+      - subCateId:20097,20098,20075,20077,20078,20079,20096
+
+
   - 状态：
-    - 连载：https://www.qidian.com/all/action0/，完本：https://www.qidian.com/all/action1/
+    - 连载：action0
+    - 完本：action1
+  - 属性：
+    - 免费：VIP0
+    - VIP: VIP1
+  - 字数：
+    - size1 ~ size5
+  - 品质：
+    - sign1, sign2
+  - 更新时间：
+    - update1 ~ update4
+  - 标签：
+    - tagXXX（如：tag豪门，tag穿越等）
+    - tag豪门 tag孤儿 tag盗贼 tag特工 tag黑客 tag明星 tag特种兵 tag杀手 tag老师 tag学生 tag胖子 tag宠物 tag蜀山 tag魔王附体 tagLOL tag废材流 tag护短 tag卡片 tag手游 tag法师 tag医生 tag感情 tag鉴宝 tag亡灵 tag职场 tag吸血鬼 tag龙 tag西游 tag鬼怪 tag阵法 tag魔兽 tag勇猛 tag玄学 tag群穿 tag丹药 tag练功流 tag召唤流 tag恶搞 tag爆笑 tag轻松 tag冷酷 tag腹黑 tag阳光 tag狡猾 tag机智 tag猥琐 tag嚣张 tag淡定 tag僵尸 tag丧尸 tag盗墓 tag随身流 tag软饭流 tag无敌文 tag异兽流 tag系统流 tag洪荒流 tag学院流 tag位面 tag铁血 tag励志 tag坚毅 tag变身 tag强者回归 tag赚钱 tag争霸流 tag种田文 tag宅男 tag无限流 tag技术流 tag凡人流 tag热血 tag重生 tag穿越
 
 
 以上多个条件混合的时候，除了男女这个选项外，其他选项全部在最后那个参数上用减号隔开。
 如：男，东方玄幻，连载： https://www.qidian.com/all/chanId21-subCateId8-action0/
+chanId和subCateId有相应的组合
 
 经过分析，以上内容回头先人工抓取下来，作为入口地址。
 

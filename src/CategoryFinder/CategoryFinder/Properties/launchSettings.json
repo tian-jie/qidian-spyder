@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CategoryFinder": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
