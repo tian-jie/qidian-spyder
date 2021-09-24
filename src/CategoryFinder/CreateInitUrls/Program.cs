@@ -144,9 +144,9 @@ namespace CreateInitUrls
                                                 StackExchangeRedisHelper.Set(str, "");
                                                 categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(str));
                                                 cnt++;
-                                                if(cnt % 1000 == 0)
+                                                if (cnt % 1000 == 0)
                                                 {
-                                                    Console.Write("\r -{0}/{1} ({2:0.00%})-", cnt, totalCnt, cnt / totalCnt);
+                                                    Console.Write("\r -{0}/{1} ({2:0.00%})-", cnt, totalCnt, cnt * 1.0 / totalCnt);
                                                 }
                                             }
                                             catch (Exception ex)
