@@ -352,6 +352,6 @@ namespace CategoryFinder
 
     internal class BaseSystemInfo
     {
-        internal static readonly string SystemCode = "000A";
+        internal static readonly string SystemCode = "";
     }
 }

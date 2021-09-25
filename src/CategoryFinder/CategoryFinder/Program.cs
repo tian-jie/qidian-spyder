@@ -1,6 +1,7 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -12,6 +13,7 @@ namespace CategoryFinder
 {
     class Program
     {
+        static bool isProgramTerminated = false;
         static ConnectionFactory factory = new ConnectionFactory()
         {
             HostName = Common.GetSettings("RabbitMQ:host"),
@@ -27,16 +29,24 @@ namespace CategoryFinder
         static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
-            for (var i = 0; i < int.Parse(Common.GetSettings("General:threadNumber")); i++)
+            AdjustThreads();
+            //Timer timer = new Timer(delegate
+            //    {
+            //        AdjustThreads();
+            //    },
+            //    null,
+            //    2000,
+            //    1000
+            //);
+            var programTimeCnt = 0;
+            while (!isProgramTerminated)
             {
-                Task.Run(() =>
+                Thread.Sleep(1000);
+                var restartDuration = int.Parse(Common.GetSettings("General:restartDuration"));
+                if (++programTimeCnt>= restartDuration)
                 {
-                    InitRabbitMQ();
-                });
-            }
-            while (true)
-            {
-                Thread.Sleep(int.MaxValue);
+                    break;
+                }
             }
         }
 
@@ -48,14 +58,14 @@ namespace CategoryFinder
 
             connection = factory.CreateConnection();
             var categoryChannel = connection.CreateModel();
-            categoryChannel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+            categoryChannel.BasicQos(prefetchSize: 0, prefetchCount: 5, global: false);
 
             var novelChannel = connection.CreateModel();
-            novelChannel.QueueDeclare(queue: "novel", false, false, false, null);//创建一个名称为novel的消息队列
+            novelChannel.QueueDeclare(queue: "novel", true, false, false, null);//创建一个名称为novel的消息队列
 
-            categoryChannel.QueueDeclare(queue: "category", false, false, false, null);//创建一个名称为category的消息队列
+            categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为category的消息队列
             var consumer = new EventingBasicConsumer(categoryChannel);
-            categoryChannel.BasicConsume("category", false, consumer);
+            categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
             var httpCode = HttpStatusCode.Moved;
 
             consumer.Received += (sender, e) =>
@@ -63,7 +73,7 @@ namespace CategoryFinder
                 try
                 {
                     var message = Encoding.UTF8.GetString(e.Body.ToArray());
-                    Console.WriteLine("已接收： {0}", message);
+                    //Console.WriteLine("已接收： {0}", message);
                     var httpClient = new HttpClient();
                     httpClient.DefaultRequestHeaders.Add("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36");
                     HttpResponseMessage response = null;
@@ -101,6 +111,11 @@ namespace CategoryFinder
                 catch (Exception ex)
                 {
                     Console.WriteLine("Error: {0}", GetInnerExceptionString(ex, 0));
+                    if (ex.Message.Contains("redis"))
+                    {
+                        Console.WriteLine("Error: Redis error, program terminating...");
+                        isProgramTerminated = true;
+                    }
                 }
             };
             categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
@@ -175,6 +190,7 @@ namespace CategoryFinder
                 if (AddNonDuplicateToRedis(url))
                 {
                     var properties = novelChannel.CreateBasicProperties();
+                    properties.DeliveryMode = 2;
                     novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
                 }
             }
@@ -188,6 +204,30 @@ namespace CategoryFinder
                 return true;
             }
             return false;
+        }
+
+        static List<CancellationTokenSource> cancellationTokens = new List<CancellationTokenSource>();
+        private static void AdjustThreads()
+        {
+            // 检查配置文件的线程数量
+            var threadNumber = int.Parse(Common.GetSettings("General:threadNumber"));
+            var increaseNum = threadNumber;
+            // 检查现在的剩余线程数量
+
+            // 如果现在剩余的多，挑几个给kill掉
+
+            // 如果现在剩余的少，补足
+
+
+            for (var i = 0; i < increaseNum; i++)
+            {
+                CancellationTokenSource tokenSource = new CancellationTokenSource();
+                var task = Task.Run(() =>
+                {
+                    InitRabbitMQ();
+                });
+
+            }
         }
 
     }

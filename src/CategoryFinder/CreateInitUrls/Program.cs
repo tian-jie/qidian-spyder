@@ -26,9 +26,9 @@ namespace CreateInitUrls
             var connection = factory.CreateConnection();
             var categoryChannel = connection.CreateModel();
 
-            categoryChannel.QueueDeclare(queue: "category", false, false, false, null);//创建一个名称为category的消息队列
+            categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为category的消息队列
             var properties = categoryChannel.CreateBasicProperties();
-
+            properties.DeliveryMode = 2;
 
             string[] chancates = {
                 "chanId21-subCateId8",
