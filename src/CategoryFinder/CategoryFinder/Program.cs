@@ -1,4 +1,5 @@
-﻿using RabbitMQ.Client;
+﻿using Domain;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ namespace CategoryFinder
             {
                 Thread.Sleep(1000);
                 var restartDuration = int.Parse(Common.GetSettings("General:restartDuration"));
-                if (++programTimeCnt>= restartDuration)
+                if (++programTimeCnt >= restartDuration)
                 {
                     break;
                 }
@@ -62,6 +63,11 @@ namespace CategoryFinder
 
             var novelChannel = connection.CreateModel();
             novelChannel.QueueDeclare(queue: "novel", true, false, false, null);//创建一个名称为novel的消息队列
+
+            var htmlChannel = connection.CreateModel();
+            htmlChannel.QueueDeclare(queue: "html", true, false, false, null);//创建一个名称为html的消息队列
+            var htmlChannelProperties = htmlChannel.CreateBasicProperties();
+            htmlChannelProperties.DeliveryMode = 2;
 
             categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为category的消息队列
             var consumer = new EventingBasicConsumer(categoryChannel);
@@ -97,8 +103,16 @@ namespace CategoryFinder
                         }
 
                         var html = response.Content.ReadAsStringAsync().Result;
+                        // html内容保存到rabbitmq中，由程序逐步同步到pg数据库中
+                        var htmlObj = new PageHtml()
+                        {
+                            Url = url,
+                            Html = html,
+                            CreatedTime = DateTime.Now
+                        };
+                        htmlChannel.BasicPublish("", "html", htmlChannelProperties, Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(htmlObj)));
 
-                        StackExchangeRedisHelper.Set(url, html);
+                        //StackExchangeRedisHelper.Set(url, html);
                         // 对HTML进行正则表达式查找，查找下一页的链接
                         if (GetNovelsLink(novelChannel, html) < 10)
                         {
