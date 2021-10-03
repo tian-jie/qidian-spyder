@@ -27,40 +27,16 @@ namespace CategoryFinder
             Port = int.Parse(BookFinder.Tools.Common.GetSettings("RabbitMQ:port"))
         };
 
-        static string[] timeSlotsNames = { "", "", "", "", "", "", "", "", "", "" };
-        static long[] timeSlots = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-        //static int[] timeSlotsPercentage = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-        static long[] ts = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-        static long[] te = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-
         static IConnection connection;
 
         const string Blanks = "                                                                                                     ";
-        static int csvlines = 0;
-        static StreamWriter performanceTracingSw;
-        static long freq = 0;
 
         static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
 
-#if DEBUG
-            performanceTracingSw = new StreamWriter("f:\\performance-tracing.csv");
-            QueryPerformanceMethd.QueryPerformanceFrequency(ref freq);
-            freq /= 1000;
-
-            performanceTracingSw.WriteLine("Id, Time, SystemInitTime, OnRabbitMQMessageReceived, ParseMQMessage, AllHttpRequest, HttpRequest, htmlToRabbitMQ, RegexHTML, GetMatchesAndAddNonDuplicateToRedis, t9, t10");
-#endif
-
-            QueryPerformanceMethd.QueryPerformanceCounter(ref ts[0]);
             AdjustThreads();
 
-            QueryPerformanceMethd.QueryPerformanceCounter(ref te[0]);
-
-            timeSlotsNames[0] = "System Initial Time";
-            timeSlots[0] = te[0] - ts[0];
             //Timer timer = new Timer(delegate
             //    {
             //        AdjustThreads();
@@ -75,29 +51,11 @@ namespace CategoryFinder
                 Thread.Sleep(1000);
                 var restartDuration = int.Parse(Common.GetSettings("General:restartDuration"));
 
-#if DEBUG
-                var totalTime = timeSlots.Sum();
-                // 刷新显示几个数据：
-                Console.WriteLine("#######################################################");
-                for (var i = 0; i < timeSlotsNames.Length; i++)
-                {
-                    if (string.IsNullOrEmpty(timeSlotsNames[i]))
-                    {
-                        break;
-                    }
-                    var s = string.Format("{0,30}: {1} ({2:P})", timeSlotsNames[i], timeSlots[i], timeSlots[i] * 1.0 / totalTime);
-                    Console.WriteLine(s);
-                }
-#endif
                 if (++programTimeCnt >= restartDuration)
                 {
                     break;
                 }
             }
-#if DEBUG
-            performanceTracingSw.Close();
-            performanceTracingSw.Dispose();
-#endif
         }
 
         private static void InitRabbitMQ()
@@ -133,77 +91,46 @@ namespace CategoryFinder
 
         private static async Task OnRabbitMQMessageReceived(object sender, BasicDeliverEventArgs e, IModel htmlChannel, IBasicProperties htmlChannelProperties, IModel novelChannel, IModel categoryChannel)
         {
-            timeSlotsNames[1] = "OnRabbitMQMessageReceived";
-            QueryPerformanceMethd.QueryPerformanceCounter(ref ts[1]);
             var httpCode = HttpStatusCode.Moved;
             try
             {
-                timeSlotsNames[2] = "ParseMQMessage";
-                QueryPerformanceMethd.QueryPerformanceCounter(ref ts[2]);
                 var message = Encoding.UTF8.GetString(e.Body.ToArray());
-                QueryPerformanceMethd.QueryPerformanceCounter(ref te[2]);
-                timeSlots[2] = te[2] - ts[2];
-                //Console.WriteLine("已接收： {0}", message);
-                timeSlotsNames[3] = "AllHttpRequest";
-                QueryPerformanceMethd.QueryPerformanceCounter(ref ts[3]);
                 var httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.Add("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36");
                 HttpResponseMessage response = null;
 
-                for (var page = 1; true; page++)
+                var url = message;
+                Console.WriteLine("正在获取： {0}", url);
+
+                while (true)
                 {
-                    var url = message + "-page" + page;
-                    Console.WriteLine("正在获取： {0}", url);
-                    // 只管第一个
-                    timeSlotsNames[4] = "HttpRequest";
-                    QueryPerformanceMethd.QueryPerformanceCounter(ref ts[4]);
+                    response = await httpClient.GetAsync(url);
 
-                    while (true)
+                    httpCode = response.StatusCode;
+                    if (httpCode == HttpStatusCode.Moved || httpCode == HttpStatusCode.Redirect)
                     {
-                        response = await httpClient.GetAsync(url);
-
-                        httpCode = response.StatusCode;
-                        if (httpCode == HttpStatusCode.Moved || httpCode == HttpStatusCode.Redirect)
-                        {
-                            url = response.Headers.Location.ToString();
-                        }
-                        else
-                        {
-                            break;
-                        }
+                        url = response.Headers.Location.ToString();
                     }
-                    var html = await response.Content.ReadAsStringAsync();
-
-                    if (page == 1)
+                    else
                     {
-                        QueryPerformanceMethd.QueryPerformanceCounter(ref te[4]);
-                        timeSlots[4] = te[4] - ts[4];
-                    };
-
-                    timeSlotsNames[5] = "htmlToRabbitMQ";
-                    QueryPerformanceMethd.QueryPerformanceCounter(ref ts[5]);
-
-                    // html内容保存到rabbitmq中，由程序逐步同步到pg数据库中
-                    var htmlObj = new PageHtml()
-                    {
-                        Url = url,
-                        Html = html,
-                        CreatedTime = DateTime.Now
-                    };
-                    htmlChannel.BasicPublish("", "html", htmlChannelProperties, Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(htmlObj)));
-
-                    QueryPerformanceMethd.QueryPerformanceCounter(ref te[5]);
-                    timeSlots[5] = te[5] - ts[5];
-
-                    //StackExchangeRedisHelper.Set(url, html);
-                    // 对HTML进行正则表达式查找，查找下一页的链接
-                    if (GetNovelsLink(novelChannel, html) < 10)
-                    {
-                        categoryChannel.BasicAck(e.DeliveryTag, true);
                         break;
                     }
                 }
+                var html = await response.Content.ReadAsStringAsync();
 
+                // html内容保存到rabbitmq中，由程序逐步同步到pg数据库中
+                var htmlObj = new PageHtml()
+                {
+                    Url = url,
+                    Html = html,
+                    CreatedTime = DateTime.Now
+                };
+                htmlChannel.BasicPublish("", "html", htmlChannelProperties, Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(htmlObj)));
+
+                //StackExchangeRedisHelper.Set(url, html);
+                // 对HTML进行正则表达式查找，查找下一页的链接
+                GetNovelsLink(novelChannel, categoryChannel, url.Split('/')[2], html);
+                categoryChannel.BasicAck(e.DeliveryTag, true);
             }
             catch (Exception ex)
             {
@@ -216,29 +143,6 @@ namespace CategoryFinder
             }
             finally
             {
-#if DEBUG
-                QueryPerformanceMethd.QueryPerformanceCounter(ref te[1]);
-                timeSlots[1] = te[1] - ts[1];
-                QueryPerformanceMethd.QueryPerformanceCounter(ref te[3]);
-                timeSlots[3] = te[3] - ts[3];
-
-
-
-                var s = string.Format("{11},{0:G},{1:C5},{2:C5},{3:C5},{4:C5},{5:C5},{6:C5},{7:C5},{8:C5},{9:C5},{10:C5}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.ffffff"),
-                    timeSlots[0] / 1000000.0,
-                    timeSlots[1] / 1000000.0,
-                    timeSlots[2] / 1000000.0,
-                    timeSlots[3] / 1000000.0,
-                    timeSlots[4] / 1000000.0,
-                    timeSlots[5] / 1000000.0,
-                    timeSlots[6] / 1000000.0,
-                    timeSlots[7] / 1000000.0,
-                    timeSlots[8] / 1000000.0,
-                    timeSlots[9] / 1000000.0,
-                    ++csvlines
-                    );
-                performanceTracingSw.WriteLine(s);
-#endif
             }
 
         }
@@ -295,38 +199,71 @@ namespace CategoryFinder
         //    }
         //}
 
-        private static int GetNovelsLink(IModel novelChannel, string html)
+        private static int GetNovelsLink(IModel novelChannel, IModel categoryChannel, string host, string html)
         {
-            timeSlotsNames[6] = "RegexHTML";
-            QueryPerformanceMethd.QueryPerformanceCounter(ref ts[6]);
+            //timeSlotsNames[6] = "RegexHTML";
+            //QueryPerformanceMethd.QueryPerformanceCounter(ref ts[6]);
 
-            var reg = "\\<a href=.*?/\\\" target=\\\"_blank\\\" data-eid=\\\".*?\\\" data-bid=\\\"(\\d*)\\\"\\>.*?\\</a\\>";
+            //var reg = "\\<a href=.*?/\\\" target=\\\"_blank\\\" data-eid=\\\".*?\\\" data-bid=\\\"(\\d*)\\\"\\>.*?\\</a\\>";
+            var reg = "\\<a.*?href=\\\"(.*?)\\\"";
             var regex = new Regex(reg);
             var matches = regex.Matches(html);
             if (matches.Count == 0)
             {
                 Console.WriteLine("no match");
             }
-            QueryPerformanceMethd.QueryPerformanceCounter(ref te[6]);
-            timeSlots[6] = te[6] - ts[6];
+            //QueryPerformanceMethd.QueryPerformanceCounter(ref te[6]);
+            //timeSlots[6] = te[6] - ts[6];
 
-            timeSlotsNames[7] = "GetMatchesAndAddNonDuplicateToRedis";
-            QueryPerformanceMethd.QueryPerformanceCounter(ref ts[7]);
+            //timeSlotsNames[7] = "GetMatchesAndAddNonDuplicateToRedis";
+            //QueryPerformanceMethd.QueryPerformanceCounter(ref ts[7]);
+            var properties = novelChannel.CreateBasicProperties();
+            properties.DeliveryMode = 2;
+
+            var newNovelNum = 0;
+            var newCateNum = 0;
+            var novelNum = 0;
+            var cateNum = 0;
 
             foreach (Match match in matches)
             {
-                var url = string.Format("https://book.qidian.com/info/{0}/", match.Groups[1].Value);
-                Console.WriteLine("novel found: {0}", url);
-                // 检查这个url出现过没
-                if (AddNonDuplicateToRedis(url))
+                //var url = string.Format("https://book.qidian.com/info/{0}/", match.Groups[1].Value);
+                var url = match.Groups[1].Value;
+                if (url.StartsWith("//book.qidian.com"))
                 {
-                    var properties = novelChannel.CreateBasicProperties();
-                    properties.DeliveryMode = 2;
-                    novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
+                    novelNum++;
+                    url = "https" + url;
+                    // 是一个book被找到了，检查这个url出现过没
+                    if (AddNonDuplicateToRedis(url))
+                    {
+                        novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
+                        newNovelNum++;
+                    }
+                }
+                else if (url.StartsWith("//"))
+                {
+                    cateNum++;
+                    url = "https:" + url;
+                    // 是一个页面被找到了，检查这个url出现过没
+                    if (AddNonDuplicateToRedis(url))
+                    {
+                        categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
+                        newCateNum++;
+                    }
+                }
+                else if (url.StartsWith("/"))
+                {
+                    cateNum++;
+                    url = "https://" + host + url;
+                    // 是一个页面被找到了，检查这个url出现过没
+                    if (AddNonDuplicateToRedis(url))
+                    {
+                        categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
+                        newCateNum++;
+                    }
                 }
             }
-            QueryPerformanceMethd.QueryPerformanceCounter(ref te[7]);
-            timeSlots[7] = te[7] - ts[7];
+            Console.WriteLine("本页抓取到：页面- {0}, 小说: {1}, 新页面: {2}, 新小说: {3}", cateNum, novelNum, newCateNum, newNovelNum);
 
             return matches.Count;
         }
