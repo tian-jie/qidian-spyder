@@ -244,7 +244,7 @@ namespace CategoryFinder
                 {
                     InitRabbitMQ();
                 });
-
+                Thread.Sleep(1000);
             }
         }
 
