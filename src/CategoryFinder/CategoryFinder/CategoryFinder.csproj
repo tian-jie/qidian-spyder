@@ -14,7 +14,8 @@
     <PackageReference Include="StackExchange.Redis" Version="2.2.50" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Domain\Domain.csproj" />
+    <ProjectReference Include="..\BookFinder.Common.Tools\BookFinder.Tools.csproj" />
+    <ProjectReference Include="..\Domain\BookFinder.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">

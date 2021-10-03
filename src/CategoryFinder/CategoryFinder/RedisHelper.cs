@@ -1,4 +1,5 @@
-﻿using StackExchange.Redis;
+﻿using BookFinder.Tools;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -348,10 +349,26 @@ namespace CategoryFinder
             return endpoints;
         }
 
+        public static void BatchInsert(List<KVPair> kvList)
+        {
+            var db = GetDatabase();
+            var batch = db.CreateBatch();
+            foreach(var kv in kvList)
+            {
+                batch.SetAddAsync(kv.Key, kv.Value);
+            }
+            batch.Execute();
+        }
     }
 
     internal class BaseSystemInfo
     {
         internal static readonly string SystemCode = "";
+    }
+
+    public class KVPair
+    {
+        public string Key { get; set; }
+        public string Value { get; set; }
     }
 }

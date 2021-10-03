@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "BookFinder.SyncHtmlToDatabase": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}

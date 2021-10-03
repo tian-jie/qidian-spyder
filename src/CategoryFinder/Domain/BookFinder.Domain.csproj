@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
+    <AssemblyName>BookFinder.Domain</AssemblyName>
+    <RootNamespace>BookFinder.Domain</RootNamespace>
   </PropertyGroup>
 
 </Project>

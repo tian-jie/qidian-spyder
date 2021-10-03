@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System.IO;
 
-namespace CategoryFinder
+namespace BookFinder.Tools
 {
     public static class Common
     {

@@ -1,4 +1,5 @@
-﻿using Domain;
+﻿using BookFinder.Tools;
+using Domain;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
@@ -17,10 +18,10 @@ namespace CategoryFinder
         static bool isProgramTerminated = false;
         static ConnectionFactory factory = new ConnectionFactory()
         {
-            HostName = Common.GetSettings("RabbitMQ:host"),
-            UserName = Common.GetSettings("RabbitMQ:user"),
-            Password = Common.GetSettings("RabbitMQ:password"),
-            Port = int.Parse(Common.GetSettings("RabbitMQ:port"))
+            HostName = BookFinder.Tools.Common.GetSettings("RabbitMQ:host"),
+            UserName = BookFinder.Tools.Common.GetSettings("RabbitMQ:user"),
+            Password = BookFinder.Tools.Common.GetSettings("RabbitMQ:password"),
+            Port = int.Parse(BookFinder.Tools.Common.GetSettings("RabbitMQ:port"))
         };
 
         static IConnection connection;
@@ -58,6 +59,7 @@ namespace CategoryFinder
             factory.AutomaticRecoveryEnabled = true;
 
             connection = factory.CreateConnection();
+            Console.WriteLine("正在创建：" + Thread.CurrentThread.ManagedThreadId.ToString());
             var categoryChannel = connection.CreateModel();
             categoryChannel.BasicQos(prefetchSize: 0, prefetchCount: 5, global: false);
 
@@ -132,7 +134,9 @@ namespace CategoryFinder
                     }
                 }
             };
-            categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
+
+            Console.WriteLine("线程启动完成：" + Thread.CurrentThread.ManagedThreadId.ToString());
+
         }
 
         private static string GetInnerExceptionString(Exception ex, int level)
@@ -189,7 +193,7 @@ namespace CategoryFinder
 
         private static int GetNovelsLink(IModel novelChannel, string html)
         {
-            var reg = "\\<a href=\\\"(//book\\.qidian.com/info/\\d*)\\\" target=\\\"_blank\\\" data-eid=\\\".*?\\\" data-bid=\\\"\\d*\\\"\\>.*?\\</a\\>";
+            var reg = "\\<a href=.*?/\\\" target=\\\"_blank\\\" data-eid=\\\".*?\\\" data-bid=\\\"(\\d*)\\\"\\>.*?\\</a\\>";
             var regex = new Regex(reg);
             var matches = regex.Matches(html);
             if (matches.Count == 0)
@@ -198,7 +202,7 @@ namespace CategoryFinder
             }
             foreach (Match match in matches)
             {
-                var url = "https:" + match.Groups[1].Value;
+                var url = string.Format("https://book.qidian.com/info/{0}/", match.Groups[1].Value);
                 Console.WriteLine("novel found: {0}", url);
                 // 检查这个url出现过没
                 if (AddNonDuplicateToRedis(url))
