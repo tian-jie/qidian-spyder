@@ -81,22 +81,22 @@ namespace CategoryFinder
             var consumer = new EventingBasicConsumer(categoryChannel);
             categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
 
+            var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36");
+
             consumer.Received += async (sender, e) =>
             {
-                await OnRabbitMQMessageReceived(sender, e, htmlChannel, htmlChannelProperties, novelChannel, categoryChannel);
+                await OnRabbitMQMessageReceived(sender, e, htmlChannel, htmlChannelProperties, novelChannel, categoryChannel, httpClient);
             };
 
             Console.WriteLine("线程启动完成：" + Thread.CurrentThread.ManagedThreadId.ToString());
         }
 
-        private static async Task OnRabbitMQMessageReceived(object sender, BasicDeliverEventArgs e, IModel htmlChannel, IBasicProperties htmlChannelProperties, IModel novelChannel, IModel categoryChannel)
+        private static async Task OnRabbitMQMessageReceived(object sender, BasicDeliverEventArgs e, IModel htmlChannel, IBasicProperties htmlChannelProperties, IModel novelChannel, IModel categoryChannel, HttpClient httpClient)
         {
-            var httpCode = HttpStatusCode.Moved;
             try
             {
                 var message = Encoding.UTF8.GetString(e.Body.ToArray());
-                var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36");
                 HttpResponseMessage response = null;
 
                 var url = message;
@@ -106,7 +106,7 @@ namespace CategoryFinder
                 {
                     response = await httpClient.GetAsync(url);
 
-                    httpCode = response.StatusCode;
+                    var httpCode = response.StatusCode;
                     if (httpCode == HttpStatusCode.Moved || httpCode == HttpStatusCode.Redirect)
                     {
                         url = response.Headers.Location.ToString();
@@ -243,6 +243,10 @@ namespace CategoryFinder
                 else if (url.StartsWith("//"))
                 {
                     cateNum++;
+                    if (!url.Contains("qidian.com"))
+                    {
+                        continue;
+                    }
                     url = "https:" + url;
                     // 是一个页面被找到了，检查这个url出现过没
                     if (AddNonDuplicateToRedis(url))
@@ -262,6 +266,7 @@ namespace CategoryFinder
                         newCateNum++;
                     }
                 }
+                Thread.Sleep(10);
             }
             Console.WriteLine("本页抓取到：页面- {0}, 小说: {1}, 新页面: {2}, 新小说: {3}", cateNum, novelNum, newCateNum, newNovelNum);
 

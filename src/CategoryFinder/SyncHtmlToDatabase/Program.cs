@@ -53,8 +53,8 @@ namespace SyncHtmlToDatabase
                 {
                     pageHtmlAckList.Add(new PageHtmlAck()
                     {
-                        Url = pageHtml.Url,
-                        Html = pageHtml.Html,
+                        Url = pageHtml.Url.Replace("\u0000", ""),
+                        Html = pageHtml.Html.Replace("\u0000", ""),
                         CreatedTime = pageHtml.CreatedTime,
                         DeliveryTag = e.DeliveryTag
                     });
