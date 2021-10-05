@@ -7,13 +7,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CategoryFinder", "CategoryF
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CreateInitUrls", "CreateInitUrls\CreateInitUrls.csproj", "{66F5672E-9547-4422-99A1-387C787A92F0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinder.Domain", "Domain\BookFinder.Domain.csproj", "{EDE61188-C86F-4960-A428-AF3BBBEDCBCF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.Domain", "Domain\BookFinder.Domain.csproj", "{EDE61188-C86F-4960-A428-AF3BBBEDCBCF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinder.SyncHtmlToDatabase", "SyncHtmlToDatabase\BookFinder.SyncHtmlToDatabase.csproj", "{6648A9DF-5D39-461C-B387-85D9833E6478}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.SyncHtmlToDatabase", "SyncHtmlToDatabase\BookFinder.SyncHtmlToDatabase.csproj", "{6648A9DF-5D39-461C-B387-85D9833E6478}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinder.EntityFrameworkCore", "BookFinder.EntityFrameworkCore\BookFinder.EntityFrameworkCore.csproj", "{E4AD7092-B308-49FC-B9A5-A8E1EC9FD84E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.EntityFrameworkCore", "BookFinder.EntityFrameworkCore\BookFinder.EntityFrameworkCore.csproj", "{E4AD7092-B308-49FC-B9A5-A8E1EC9FD84E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinder.Tools", "BookFinder.Common.Tools\BookFinder.Tools.csproj", "{E1951CC1-A633-4690-BC4B-FCE23AFFE43B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.Tools", "BookFinder.Common.Tools\BookFinder.Tools.csproj", "{E1951CC1-A633-4690-BC4B-FCE23AFFE43B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinder.DuplicateUrlCheck", "BookFinder.DuplicateUrlCheck\BookFinder.DuplicateUrlCheck.csproj", "{428F9DF9-F156-4F74-B430-BEFA745F6553}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,6 +47,10 @@ Global
 		{E1951CC1-A633-4690-BC4B-FCE23AFFE43B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E1951CC1-A633-4690-BC4B-FCE23AFFE43B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E1951CC1-A633-4690-BC4B-FCE23AFFE43B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

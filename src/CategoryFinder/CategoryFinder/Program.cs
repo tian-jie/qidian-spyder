@@ -1,14 +1,13 @@
-﻿using BookFinder.Tools;
-using Domain;
+﻿using Domain;
+using log4net;
+using log4net.Config;
+using log4net.Repository;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -29,13 +28,27 @@ namespace CategoryFinder
 
         static IConnection connection;
 
-        const string Blanks = "                                                                                                     ";
+
+        private static ILoggerRepository LoggerRepository;
+        private static ILog _logger;
+        // 检查配置文件的线程数量
+        private static int configThreadNumber = int.Parse(BookFinder.Tools.Common.GetSettings("General:threadNumber"));
+
+        private static IModel _categoryChannel;
+        private static IModel _novelChannel;
+        private static IModel _urlToRedisChannel;
+        private static IModel _htmlChannel;
+        private static IBasicProperties _htmlChannelProperties;
+
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
 
-            AdjustThreads();
+            LoggerRepository = LogManager.CreateRepository("Log4netConsolePractice");
+            XmlConfigurator.ConfigureAndWatch(LoggerRepository, new FileInfo(BookFinder.Tools.Common.GetSettings("LogConfiguration:log4netConfigFile")));
+            _logger = LogManager.GetLogger(LoggerRepository.Name, typeof(Program));
+
+            _logger.Debug("System warm up...");
 
             //Timer timer = new Timer(delegate
             //    {
@@ -46,160 +59,144 @@ namespace CategoryFinder
             //    1000
             //);
             var programTimeCnt = 0;
+
+            InitRabbitMQ();
+
             while (!isProgramTerminated)
             {
-                Thread.Sleep(1000);
-                var restartDuration = int.Parse(Common.GetSettings("General:restartDuration"));
+                var restartDuration = int.Parse(BookFinder.Tools.Common.GetSettings("General:restartDuration"));
 
+                AdjustThreads();
                 if (++programTimeCnt >= restartDuration)
                 {
                     break;
                 }
+                Thread.Sleep(10000);
             }
         }
 
         private static void InitRabbitMQ()
         {
-            // 正在启动线程
-            Console.WriteLine("正在启动线程：" + Thread.CurrentThread.ManagedThreadId.ToString());
-            factory.AutomaticRecoveryEnabled = true;
-
-            connection = factory.CreateConnection();
-            Console.WriteLine("正在创建：" + Thread.CurrentThread.ManagedThreadId.ToString());
-            var categoryChannel = connection.CreateModel();
-            categoryChannel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
-
-            var novelChannel = connection.CreateModel();
-            novelChannel.QueueDeclare(queue: "novel", true, false, false, null);//创建一个名称为novel的消息队列
-
-            var htmlChannel = connection.CreateModel();
-            htmlChannel.QueueDeclare(queue: "html", true, false, false, null);//创建一个名称为html的消息队列
-            var htmlChannelProperties = htmlChannel.CreateBasicProperties();
-            htmlChannelProperties.DeliveryMode = 2;
-
-            categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为category的消息队列
-            var consumer = new EventingBasicConsumer(categoryChannel);
-            categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
-
-            var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Add("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36");
-
-            consumer.Received += async (sender, e) =>
-            {
-                await OnRabbitMQMessageReceived(sender, e, htmlChannel, htmlChannelProperties, novelChannel, categoryChannel, httpClient);
-            };
-
-            Console.WriteLine("线程启动完成：" + Thread.CurrentThread.ManagedThreadId.ToString());
-        }
-
-        private static async Task OnRabbitMQMessageReceived(object sender, BasicDeliverEventArgs e, IModel htmlChannel, IBasicProperties htmlChannelProperties, IModel novelChannel, IModel categoryChannel, HttpClient httpClient)
-        {
             try
             {
-                var message = Encoding.UTF8.GetString(e.Body.ToArray());
-                HttpResponseMessage response = null;
+                // 正在启动线程
+                Console.WriteLine("正在初始化RabbitMQ......");
+                factory.AutomaticRecoveryEnabled = true;
 
-                var url = message;
-                Console.WriteLine("正在获取： {0}", url);
+                connection = factory.CreateConnection();
 
-                while (true)
-                {
-                    response = await httpClient.GetAsync(url);
+                _categoryChannel = connection.CreateModel();
+                _categoryChannel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+                _categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为category的消息队列
+                var consumer = new DefaultBasicConsumer(_categoryChannel);
+                _categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
 
-                    var httpCode = response.StatusCode;
-                    if (httpCode == HttpStatusCode.Moved || httpCode == HttpStatusCode.Redirect)
-                    {
-                        url = response.Headers.Location.ToString();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                var html = await response.Content.ReadAsStringAsync();
+                _novelChannel = connection.CreateModel();
+                _novelChannel.QueueDeclare(queue: "novel", true, false, false, null);//创建一个名称为novel的消息队列
 
-                // html内容保存到rabbitmq中，由程序逐步同步到pg数据库中
-                var htmlObj = new PageHtml()
-                {
-                    Url = url,
-                    Html = html,
-                    CreatedTime = DateTime.Now
-                };
-                htmlChannel.BasicPublish("", "html", htmlChannelProperties, Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(htmlObj)));
+                _urlToRedisChannel = connection.CreateModel();
+                _urlToRedisChannel.QueueDeclare(queue: "urlToRedis", true, false, false, null);//创建一个名称为novel的消息队列
 
-                //StackExchangeRedisHelper.Set(url, html);
-                // 对HTML进行正则表达式查找，查找下一页的链接
-                GetNovelsLink(novelChannel, categoryChannel, url.Split('/')[2], html);
-                categoryChannel.BasicAck(e.DeliveryTag, true);
+                _htmlChannel = connection.CreateModel();
+                _htmlChannel.QueueDeclare(queue: "html", true, false, false, null);//创建一个名称为html的消息队列
+                _htmlChannelProperties = _htmlChannel.CreateBasicProperties();
+                _htmlChannelProperties.DeliveryMode = 2;
+
+
+                Console.WriteLine("初始化RabbitMQ完成");
+
+                //consumer.Received += async (sender, e) =>
+                //{
+                //    await OnRabbitMQMessageReceived(e.Body.ToArray(), e.DeliveryTag, htmlChannel, htmlChannelProperties, novelChannel, categoryChannel, httpClient);
+                //};
+
+                // 初始化Redis
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error: {0}", GetInnerExceptionString(ex, 0));
-                if (ex.Message.Contains("redis"))
+                _logger.Error(string.Format("Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0)));
+                Console.WriteLine(string.Format("Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0)));
+                Console.WriteLine("初始化RabbitMQ错误");
+            }
+        }
+
+        private static async void RabbitMQThread(IModel categoryChannel_T, IModel novelChannel, IModel htmlChannel, IBasicProperties htmlChannelProperties)
+        {
+            try
+            {
+                var categoryChannel = connection.CreateModel();
+                //categoryChannel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+                categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为category的消息队列
+                //var consumer = new DefaultBasicConsumer(categoryChannel);
+                //categoryChannel.BasicConsume(queue: "category", autoAck: false, consumer: consumer);
+
+                var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Add("UserAgent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36");
+
+                currentThreadNumber++;
+                while (true)
                 {
-                    Console.WriteLine("Error: Redis error, program terminating...");
-                    isProgramTerminated = true;
+                    var message = categoryChannel.BasicGet(queue: "category", autoAck: false);
+                    if(message == null)
+                    {
+                        Console.WriteLine("没找到，等10秒再找...");
+                        Thread.Sleep(10000);
+                        continue;
+                    }
+                    await OnRabbitMQMessageReceived(message.Body.ToArray(), message.DeliveryTag, htmlChannel, htmlChannelProperties, novelChannel, categoryChannel, httpClient);
+                }
+            }catch(Exception ex)
+            {
+                _logger.Error(string.Format("{1} [{2}] - Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Thread.CurrentThread.ManagedThreadId.ToString()));
+                Console.WriteLine(string.Format("{1} [{2}] - Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Thread.CurrentThread.ManagedThreadId.ToString()));
+                Console.WriteLine("线程退出：" + Thread.CurrentThread.ManagedThreadId.ToString());
+                currentThreadNumber--;
+            }
+        }
+
+        private static async Task OnRabbitMQMessageReceived(byte[] body, ulong deliveryTag, IModel htmlChannel, IBasicProperties htmlChannelProperties, IModel novelChannel, IModel categoryChannel, HttpClient httpClient)
+        {
+            var message = Encoding.UTF8.GetString(body);
+            HttpResponseMessage response = null;
+
+            var url = message;
+            _logger.Debug(string.Format("正在获取： {0}", url));
+
+            while (true)
+            {
+                response = await httpClient.GetAsync(url);
+
+                var httpCode = response.StatusCode;
+                if (httpCode == HttpStatusCode.Moved || httpCode == HttpStatusCode.Redirect)
+                {
+                    url = response.Headers.Location.ToString();
+                }
+                else
+                {
+                    break;
                 }
             }
-            finally
+            var html = await response.Content.ReadAsStringAsync();
+
+            // html内容保存到rabbitmq中，由程序逐步同步到pg数据库中
+            var htmlObj = new PageHtml()
             {
-            }
+                Url = url,
+                Html = html,
+                CreatedTime = DateTime.Now
+            };
+            htmlChannel.BasicPublish("", "html", htmlChannelProperties, Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(htmlObj)));
+
+            //StackExchangeRedisHelper.Set(url, html);
+            // 对HTML进行正则表达式查找，查找下一页的链接
+            GetNovelsLink(url.Split('/')[2], html);
+            categoryChannel.BasicAck(deliveryTag, true);
+            _logger.Debug(string.Format("获取完成： {0}", url));
 
         }
 
-        private static string GetInnerExceptionString(Exception ex, int level)
-        {
-            if (ex == null)
-            {
-                return "";
-            }
-            var str = ex.Message;
-            if (ex.InnerException != null)
-            {
-                str += "\n" + Blanks.Substring(0, level) + "- " + GetInnerExceptionString(ex.InnerException, level + 1);
-            }
-            return str;
-        }
 
-        //static void NewPageq(object model, BasicDeliverEventArgs ea)
-        //{
-        //    try
-        //    {
-        //        var message = Encoding.UTF8.GetString(ea.Body.ToArray());
-        //        Console.WriteLine("已接收： {0}", message);
-        //        var httpCode = HttpStatusCode.Moved;
-        //        var httpClient = new HttpClient();
-        //        HttpResponseMessage response = null;
-        //        var url = message;
-        //        while (true)
-        //        {
-        //            response = httpClient.GetAsync(url).Result;
-
-        //            httpCode = response.StatusCode;
-        //            if (httpCode == HttpStatusCode.Moved || httpCode == HttpStatusCode.Redirect)
-        //            {
-        //                url = response.Headers.Location.ToString();
-        //            }
-        //            else
-        //            {
-        //                break;
-        //            }
-        //        }
-
-        //        var html = response.Content.ReadAsStringAsync().Result;
-
-        //        StackExchangeRedisHelper.Set(message, html);
-        //        // 对HTML进行正则表达式查找，查找下一页的链接
-        //        GetNovelsLink(html);
-        //        categoryChannel.BasicAck(ea.DeliveryTag, true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine("Error: {0}", ex.Message);
-        //    }
-        //}
-
-        private static int GetNovelsLink(IModel novelChannel, IModel categoryChannel, string host, string html)
+        private static int GetNovelsLink(string host, string html)
         {
             //timeSlotsNames[6] = "RegexHTML";
             //QueryPerformanceMethd.QueryPerformanceCounter(ref ts[6]);
@@ -217,7 +214,7 @@ namespace CategoryFinder
 
             //timeSlotsNames[7] = "GetMatchesAndAddNonDuplicateToRedis";
             //QueryPerformanceMethd.QueryPerformanceCounter(ref ts[7]);
-            var properties = novelChannel.CreateBasicProperties();
+            var properties = _novelChannel.CreateBasicProperties();
             properties.DeliveryMode = 2;
 
             var newNovelNum = 0;
@@ -232,11 +229,11 @@ namespace CategoryFinder
                 if (url.StartsWith("//book.qidian.com"))
                 {
                     novelNum++;
-                    url = "https" + url;
+                    url = "https:" + url;
                     // 是一个book被找到了，检查这个url出现过没
-                    if (AddNonDuplicateToRedis(url))
+                    //if (AddNonDuplicateToRedis(url))
                     {
-                        novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
+                        _urlToRedisChannel.BasicPublish("", "urlToRedis", properties, Encoding.UTF8.GetBytes(url));
                         newNovelNum++;
                     }
                 }
@@ -249,9 +246,9 @@ namespace CategoryFinder
                     }
                     url = "https:" + url;
                     // 是一个页面被找到了，检查这个url出现过没
-                    if (AddNonDuplicateToRedis(url))
+                    //if (AddNonDuplicateToRedis(url))
                     {
-                        categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
+                        _urlToRedisChannel.BasicPublish("", "urlToRedis", properties, Encoding.UTF8.GetBytes(url));
                         newCateNum++;
                     }
                 }
@@ -260,15 +257,15 @@ namespace CategoryFinder
                     cateNum++;
                     url = "https://" + host + url;
                     // 是一个页面被找到了，检查这个url出现过没
-                    if (AddNonDuplicateToRedis(url))
+                    //if (AddNonDuplicateToRedis(url))
                     {
-                        categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
+                        _urlToRedisChannel.BasicPublish("", "urlToRedis", properties, Encoding.UTF8.GetBytes(url));
                         newCateNum++;
                     }
                 }
                 Thread.Sleep(10);
             }
-            Console.WriteLine("本页抓取到：页面- {0}, 小说: {1}, 新页面: {2}, 新小说: {3}", cateNum, novelNum, newCateNum, newNovelNum);
+            _logger.Info(string.Format("本页抓取到：页面- {0}, 小说: {1}, 新页面: {2}, 新小说: {3}", cateNum, novelNum, newCateNum, newNovelNum));
 
             return matches.Count;
         }
@@ -277,59 +274,54 @@ namespace CategoryFinder
             if (!StackExchangeRedisHelper.Exists(url))
             {
                 StackExchangeRedisHelper.Set(url, "");
+                _logger.Warn(url);
                 return true;
             }
             return false;
         }
 
         static List<CancellationTokenSource> cancellationTokens = new List<CancellationTokenSource>();
+
+        static List<Task> _tasks = new List<Task>();
+        static bool _isIncreasingThread = false;
+        static int currentThreadNumber = 0;
         private static void AdjustThreads()
         {
-            // 检查配置文件的线程数量
-            var threadNumber = int.Parse(Common.GetSettings("General:threadNumber"));
-            var increaseNum = threadNumber;
+            if (_isIncreasingThread)
+            {
+                Console.WriteLine("正在启动线程中.....");
+                return;
+            }
             // 检查现在的剩余线程数量
+            //for(var i=0; i<_tasks.Count; i++)
+            //{
+            //    if (_tasks[i].Status == TaskStatus.RanToCompletion)
+            //    {
+            //        _tasks.RemoveAt(i);
+            //        i--;
+            //    }
+            //}
+            //var currentThreadNumber = _tasks.Count;
 
             // 如果现在剩余的多，挑几个给kill掉
 
             // 如果现在剩余的少，补足
-
-
+            var increaseNum = configThreadNumber - currentThreadNumber;
+            Console.Write("{2} - 剩余线程数：{0}, 需要补足线程数: {1} ...  ", currentThreadNumber, increaseNum, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            _isIncreasingThread = true;
             for (var i = 0; i < increaseNum; i++)
             {
-                CancellationTokenSource tokenSource = new CancellationTokenSource();
-                var task = Task.Run(() =>
+                Task.Run(() =>
                 {
-                    InitRabbitMQ();
+                    RabbitMQThread(_categoryChannel, _novelChannel, _htmlChannel, _htmlChannelProperties);
                 });
+                //_tasks.Add(task);
                 Thread.Sleep(1000);
             }
+            Console.WriteLine("补充完成！");
+            _isIncreasingThread = false;
         }
 
     }
 
-    public static class QueryPerformanceMethd
-    {
-#if DEBUG
-
-        [DllImport("kernel32.dll")]
-        public extern static short QueryPerformanceCounter(ref long x);
-
-
-        [DllImport("kernel32.dll")]
-        public extern static short QueryPerformanceFrequency(ref long x);
-#else
-        public static short QueryPerformanceCounter(ref long x)
-        {
-            // do nothing
-            return 1;
-        }
-        public static short QueryPerformanceFrequency(ref long x)
-        {
-            // do nothing
-            return 1;
-        }
-#endif
-
-    }
 }

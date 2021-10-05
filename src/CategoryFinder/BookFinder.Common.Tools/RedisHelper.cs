@@ -25,6 +25,7 @@ namespace CategoryFinder
             {
                 if (_instance == null)
                 {
+                    Console.WriteLine("Creating Redis...");
                     lock (_locker)
                     {
                         if (_instance == null || !_instance.IsConnected)
@@ -32,14 +33,14 @@ namespace CategoryFinder
                             _instance = ConnectionMultiplexer.Connect(Coonstr);
                         }
                     }
+                    //注册如下事件
+                    _instance.ConnectionFailed += MuxerConnectionFailed;
+                    _instance.ConnectionRestored += MuxerConnectionRestored;
+                    _instance.ErrorMessage += MuxerErrorMessage;
+                    _instance.ConfigurationChanged += MuxerConfigurationChanged;
+                    _instance.HashSlotMoved += MuxerHashSlotMoved;
+                    _instance.InternalError += MuxerInternalError;
                 }
-                //注册如下事件
-                _instance.ConnectionFailed += MuxerConnectionFailed;
-                _instance.ConnectionRestored += MuxerConnectionRestored;
-                _instance.ErrorMessage += MuxerErrorMessage;
-                _instance.ConfigurationChanged += MuxerConfigurationChanged;
-                _instance.HashSlotMoved += MuxerHashSlotMoved;
-                _instance.InternalError += MuxerInternalError;
                 return _instance;
             }
         }

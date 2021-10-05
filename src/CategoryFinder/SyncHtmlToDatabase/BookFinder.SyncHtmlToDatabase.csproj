@@ -14,6 +14,7 @@
     <PackageReference Include="RabbitMQ.Client" Version="6.2.2" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BookFinder.Common.Tools\BookFinder.Tools.csproj" />
     <ProjectReference Include="..\BookFinder.EntityFrameworkCore\BookFinder.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\CategoryFinder\CategoryFinder.csproj" />
     <ProjectReference Include="..\Domain\BookFinder.Domain.csproj" />
