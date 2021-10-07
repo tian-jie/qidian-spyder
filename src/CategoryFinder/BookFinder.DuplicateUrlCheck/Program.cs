@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BookFinder.DuplicateUrlCheck
 {
@@ -47,30 +48,56 @@ namespace BookFinder.DuplicateUrlCheck
             urlToRedisChannel.QueueDeclare(queue: ackQueueName, true, false, false, null);//创建一个名称为html的消息队列
             var properties = urlToRedisChannel.CreateBasicProperties();
             properties.DeliveryMode = 2;
-            urlToRedisChannel.BasicQos(prefetchSize: 0, prefetchCount: 5000, global: false);
+            urlToRedisChannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
 
 
             var consumer = new EventingBasicConsumer(urlToRedisChannel);
             urlToRedisChannel.BasicConsume(queue: ackQueueName, autoAck: false, consumer: consumer);
 
-            consumer.Received += (sender, e) =>
+            var novelChannel = connection.CreateModel();
+            novelChannel.QueueDeclare(queue: "novel", true, false, false, null);//创建一个名称为html的消息队列
+            var categoryChannel = connection.CreateModel();
+            categoryChannel.QueueDeclare(queue: "category", true, false, false, null);//创建一个名称为html的消息队列
+
+
+            Task.Run(() =>
             {
-                var message = Encoding.UTF8.GetString(e.Body.ToArray());
-                //var pageHtml = Newtonsoft.Json.JsonConvert.DeserializeObject<PageHtml>(message);
-                lock (_pageHtmlAckLocker)
+                Thread.Sleep(5000);
+                WorkerThread(urlToRedisChannel, novelChannel, categoryChannel, properties);
+            });
+
+            while (true)
+            {
+                try
                 {
-                    pageHtmlAckList.Add(new PageHtmlAck()
+                    var message = urlToRedisChannel.BasicGet(queue: ackQueueName, autoAck: false);
+                    if (message == null)
                     {
-                        Url = message.Replace("\u0000", ""),
-                        Html = "",
-                        CreatedTime = DateTime.Now,
-                        DeliveryTag = e.DeliveryTag
-                    });
+                        Console.WriteLine("没找到，等1秒再找...");
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+                    lock (_pageHtmlAckLocker)
+                    {
+                        pageHtmlAckList.Add(new PageHtmlAck()
+                        {
+                            Url = Encoding.UTF8.GetString(message.Body.ToArray()).Replace("\u0000", ""),
+                            Html = "",
+                            CreatedTime = DateTime.Now,
+                            DeliveryTag = message.DeliveryTag
+                        });
+                    }
                 }
+                catch (Exception ex)
+                {
+                    //_logger.Error(string.Format("{1} [{2}] - Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Thread.CurrentThread.ManagedThreadId.ToString()));
+                    Console.WriteLine(string.Format("{1} [{2}] - Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Thread.CurrentThread.ManagedThreadId.ToString()));
+                }
+            }
+        }
 
-            };
-
-
+        private static void WorkerThread(IModel urlToRedisChannel, IModel novelChannel, IModel categoryChannel, IBasicProperties properties)
+        {
             while (true)
             {
                 var novelNum = 0;
@@ -106,13 +133,13 @@ namespace BookFinder.DuplicateUrlCheck
                             {
                                 novelNum++;
                                 // 是一个book被找到了，检查这个url出现过没
-                                urlToRedisChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
+                                novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
                             }
                             else
                             {
                                 cateNum++;
                                 // 是一个页面被找到了，检查这个url出现过没
-                                urlToRedisChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
+                                categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
                             }
                             _logger.Fatal(pageHtmlAck.Url);
                         }
@@ -137,6 +164,5 @@ namespace BookFinder.DuplicateUrlCheck
                 }
             }
         }
-
     }
 }

@@ -266,6 +266,8 @@ namespace CategoryFinder
                 Thread.Sleep(10);
             }
             _logger.Info(string.Format("本页抓取到：页面- {0}, 小说: {1}, 新页面: {2}, 新小说: {3}", cateNum, novelNum, newCateNum, newNovelNum));
+            _ackCategoryNum++;
+            _createdNewUrlToRedisNum += cateNum + novelNum;
 
             return matches.Count;
         }
@@ -285,6 +287,10 @@ namespace CategoryFinder
         static List<Task> _tasks = new List<Task>();
         static bool _isIncreasingThread = false;
         static int currentThreadNumber = 0;
+        static int _ackCategoryNum = 0;
+        static int _createdNewUrlToRedisNum = 0;
+
+
         private static void AdjustThreads()
         {
             if (_isIncreasingThread)
@@ -307,7 +313,9 @@ namespace CategoryFinder
 
             // 如果现在剩余的少，补足
             var increaseNum = configThreadNumber - currentThreadNumber;
-            Console.Write("{2} - 剩余线程数：{0}, 需要补足线程数: {1} ...  ", currentThreadNumber, increaseNum, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            Console.Write("{2} - 剩余线程数：{0}, 需要补足线程数: {1} ...  过去10秒处理URL [{3}]个，新增url [{4}]个", currentThreadNumber, increaseNum, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), _ackCategoryNum, _createdNewUrlToRedisNum);
+            _ackCategoryNum = 0;
+            _createdNewUrlToRedisNum = 0;
             _isIncreasingThread = true;
             for (var i = 0; i < increaseNum; i++)
             {

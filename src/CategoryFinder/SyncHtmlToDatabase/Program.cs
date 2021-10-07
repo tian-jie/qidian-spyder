@@ -64,7 +64,7 @@ namespace SyncHtmlToDatabase
 
             while (true)
             {
-                Thread.Sleep(5000);
+                Thread.Sleep(int.Parse(Common.GetSettings("General:SyncHtmlToDatabase.SaveInterval")));
                 // 10秒钟同步一次数据，将预取出来的数据保存到数据库中，并且同时相应rabbitmq的ack
                 lock (_pageHtmlAckLocker)
                 {
