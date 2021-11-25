@@ -15,7 +15,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.EntityFrameworkC
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.Tools", "BookFinder.Common.Tools\BookFinder.Tools.csproj", "{E1951CC1-A633-4690-BC4B-FCE23AFFE43B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinder.DuplicateUrlCheck", "BookFinder.DuplicateUrlCheck\BookFinder.DuplicateUrlCheck.csproj", "{428F9DF9-F156-4F74-B430-BEFA745F6553}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BookFinder.DuplicateUrlCheck", "BookFinder.DuplicateUrlCheck\BookFinder.DuplicateUrlCheck.csproj", "{428F9DF9-F156-4F74-B430-BEFA745F6553}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BookFinderFullSolution", "BookFinderFullSolution\BookFinderFullSolution.csproj", "{F4C61191-3895-4917-B9DC-C6BB300E8DE1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +53,10 @@ Global
 		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{428F9DF9-F156-4F74-B430-BEFA745F6553}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4C61191-3895-4917-B9DC-C6BB300E8DE1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4C61191-3895-4917-B9DC-C6BB300E8DE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4C61191-3895-4917-B9DC-C6BB300E8DE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4C61191-3895-4917-B9DC-C6BB300E8DE1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

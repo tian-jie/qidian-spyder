@@ -48,7 +48,7 @@ namespace BookFinder.DuplicateUrlCheck
             urlToRedisChannel.QueueDeclare(queue: ackQueueName, true, false, false, null);//创建一个名称为html的消息队列
             var properties = urlToRedisChannel.CreateBasicProperties();
             properties.DeliveryMode = 2;
-            urlToRedisChannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+            urlToRedisChannel.BasicQos(prefetchSize: 0, prefetchCount: 2000, global: false);
 
 
             var consumer = new EventingBasicConsumer(urlToRedisChannel);
@@ -104,63 +104,67 @@ namespace BookFinder.DuplicateUrlCheck
                 var cateNum = 0;
                 try
                 {
-                    Thread.Sleep(1000);
-                    // 10秒钟同步一次数据，将预取出来的数据保存到数据库中，并且同时相应rabbitmq的ack
+                    Thread.Sleep(500);
+                    // 给list复制出来，然后释放list接着用
+                    var tmpList = new List<PageHtmlAck>();
                     lock (_pageHtmlAckLocker)
                     {
                         Console.Write("{1} - {0} records recieved, duplicate checking...... ", pageHtmlAckList.Count, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"));
-                        // 开始检查是否重复
-                        var kvList = new List<KVPair>();
                         foreach (var pageHtmlAck in pageHtmlAckList)
                         {
-                            if (StackExchangeRedisHelper.Exists(pageHtmlAck.Url))
-                            {
-                                continue;
-                            }
-                            if (kvList.Exists(a => a.Key == pageHtmlAck.Url))
-                            {
-                                continue;
-                            }
-                            kvList.Add(new KVPair()
-                            {
-                                Key = pageHtmlAck.Url,
-                                Value = pageHtmlAck.DeliveryTag.ToString()
-                            });
-                            var url = pageHtmlAck.Url;
-
-                            // 放到rabbitmq里
-                            if (url.StartsWith("https://book.qidian.com"))
-                            {
-                                novelNum++;
-                                // 是一个book被找到了，检查这个url出现过没
-                                novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
-                            }
-                            else
-                            {
-                                cateNum++;
-                                // 是一个页面被找到了，检查这个url出现过没
-                                categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
-                            }
-                            _logger.Fatal(pageHtmlAck.Url);
+                            tmpList.Add(pageHtmlAck);
                         }
-                        Console.WriteLine("-- Finished, final to sync {0} records, {1} pages, {2} novels", kvList.Count, cateNum, novelNum);
 
-                        StackExchangeRedisHelper.BatchInsert(kvList);
-                        // 完事后给ack掉
-                        foreach (var pageHtmlAck in pageHtmlAckList)
+                        pageHtmlAckList.Clear();
+                    }
+
+                    // 10秒钟同步一次数据，将预取出来的数据保存到数据库中，并且同时相应rabbitmq的ack
+                    // 开始检查是否重复
+                    var kvList = new List<KVPair>();
+                    foreach (var pageHtmlAck in tmpList)
+                    {
+                        if (StackExchangeRedisHelper.Exists(pageHtmlAck.Url))
                         {
-                            urlToRedisChannel.BasicAck(pageHtmlAck.DeliveryTag, true);
+                            continue;
                         }
+                        if (kvList.Exists(a => a.Key == pageHtmlAck.Url))
+                        {
+                            continue;
+                        }
+                        kvList.Add(new KVPair()
+                        {
+                            Key = pageHtmlAck.Url,
+                            Value = pageHtmlAck.DeliveryTag.ToString()
+                        });
+                        var url = pageHtmlAck.Url;
 
+                        // 放到rabbitmq里
+                        if (url.StartsWith("https://book.qidian.com"))
+                        {
+                            novelNum++;
+                            // 是一个book被找到了，检查这个url出现过没
+                            novelChannel.BasicPublish("", "novel", properties, Encoding.UTF8.GetBytes(url));
+                        }
+                        else
+                        {
+                            cateNum++;
+                            // 是一个页面被找到了，检查这个url出现过没
+                            categoryChannel.BasicPublish("", "category", properties, Encoding.UTF8.GetBytes(url));
+                        }
+                        _logger.Fatal(pageHtmlAck.Url);
+                    }
+                    Console.WriteLine("-- Finished, final to sync {0} records, {1} pages, {2} novels", kvList.Count, cateNum, novelNum);
+
+                    StackExchangeRedisHelper.BatchInsert(kvList);
+                    // 完事后给ack掉
+                    foreach (var pageHtmlAck in tmpList)
+                    {
+                        urlToRedisChannel.BasicAck(pageHtmlAck.DeliveryTag, true);
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine(string.Format("{1} [{2}] - Error: {0}", BookFinder.Tools.Common.GetInnerExceptionString(ex, 0), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Thread.CurrentThread.ManagedThreadId.ToString()));
-                }
-                finally
-                {
-                    pageHtmlAckList.Clear();
                 }
             }
         }

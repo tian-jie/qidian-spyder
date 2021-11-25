@@ -1,5 +1,6 @@
 ﻿using Domain;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 namespace BookFinder.EntityFrameworkCore
 {
@@ -7,6 +8,7 @@ namespace BookFinder.EntityFrameworkCore
     {
 
         public DbSet<PageHtml> PageHtmls { get; set; }
+        public DbSet<StockData> Stocks { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -19,7 +21,9 @@ namespace BookFinder.EntityFrameworkCore
             //if (optionsBuilder.IsConfigured)
             {
                 var connectionString = BookFinder.Tools.Common.GetSettings("ConnectionStrings:Default");
-                optionsBuilder.UseNpgsql(connectionString, builder => builder.EnableRetryOnFailure());
+                //optionsBuilder.UseNpgsql(connectionString, builder => builder.EnableRetryOnFailure());
+                //optionsBuilder.UseMySql(connectionString: connectionString, serverVersion: new MySqlServerVersion(new Version(5, 7)));
+                optionsBuilder.UseSqlServer(connectionString);
             }
         }
     }
