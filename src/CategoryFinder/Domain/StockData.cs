@@ -4,18 +4,19 @@ namespace Domain
 {
     public class StockData
     {
-        public string Code { get; set; }
-        public string Name { get; set; }
-        public string Date { get; set; }
-        public double Open { get; set; }
-        public double Close { get; set; }
-        public double High { get; set; }
-        public double Low { get; set; }
-        public double FloatPencentage { get; set; }
-        public double FloatPrice { get; set; }
-        public string TransactionNumber { get; set; }
-        public double TransactionPrice { get; set; }
-        public string Market { get; set; }
+        public int id { get; set; }
+        public string code { get; set; }
+        public string name { get; set; }
+        public string date { get; set; }
+        public double open { get; set; }
+        public double close { get; set; }
+        public double high { get; set; }
+        public double low { get; set; }
+        public double float_percentage { get; set; }
+        public double float_price { get; set; }
+        public long transaction_number { get; set; }
+        public double transaction_price { get; set; }
+        public string market { get; set; }
     }
 
 }

@@ -40,7 +40,7 @@ namespace BookFinderFullSolution
         public ComplexStringListObj AllUrlList = new ComplexStringListObj("AllUrlList");
 
         public NonStringListObj<PageHtmlAck> PageHtmlAckList = new NonStringListObj<PageHtmlAck>("PageHtmlAckList");
-        public NonStringListObj<StockData> StockDataList = new NonStringListObj<StockData>("StockDataList");
+        public NonStringListObj<UrlObject> StockUrlList = new NonStringListObj<UrlObject>("StockUrlList");
 
 
         public void Serialize()

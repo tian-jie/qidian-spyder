@@ -1,6 +1,8 @@
 ﻿using BookFinder.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,8 +21,55 @@ namespace BookFinderFullSolution
         private static void StartStockSpider()
         {
             // 初始化一堆url先，放到data里
+            var stockUrlList = DataContainers.GetInstance().StockUrlList;
+            DateTime dt = new DateTime(2000, 1, 4);
+            while (dt < DateTime.Now.Date)
+            {
+                var tdate = dt.ToString("yyyy-MM-dd");
+                stockUrlList.AddOne(new UrlObject()
+                {
+                    Url = "http://webapi.cninfo.com.cn/api/sysapi/p_sysapi1007",
+                    FormUrlEncodedContent = new FormUrlEncodedContent(new[]
+                        {
+                            new KeyValuePair<string, string>("tdate", tdate),
+                            new KeyValuePair<string, string>("market", "SZE"),
+                        })
+                });
+                stockUrlList.AddOne(new UrlObject()
+                {
+                    Url = "http://webapi.cninfo.com.cn/api/sysapi/p_sysapi1007",
+                    FormUrlEncodedContent = new FormUrlEncodedContent(new[]
+                        {
+                            new KeyValuePair<string, string>("tdate", tdate),
+                            new KeyValuePair<string, string>("market", "SHE"),
+                        })
+                });
+                dt = dt.AddDays(1);
+            }
 
             // 启动stock spider进程跑
+            var stockeSpider = new StockSpiderManager();
+            stockeSpider.Start(1);
+
+
+            while (true)
+            {
+                Thread.Sleep(1000);
+                Console.WriteLine(" Thread.Sleep 1000 done");
+                // 每秒打印一次
+                //PrintConsole(stockeSpider.AvaliableThreadNum());
+
+                var now = DateTime.Now;
+                var systemUpTime = now - _startTime;
+
+                //if (systemUpTime.Seconds == 30)
+                //{
+                //    // 每60秒调整一下相关线程数量
+                //    Console.WriteLine(" AutoAdjusting threads");
+                //    pageSpider.AutoAdjust(DataContainers.GetInstance().PageHtmlAckList.Count(), 5000, 1000);
+                //}
+            }
+
         }
 
         private static void StartBookSpider()
